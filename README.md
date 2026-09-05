@@ -7,7 +7,7 @@ Using an isolated dual-VM virtual network, network telemetry was captured, analy
 
 ---
 
-## 🏗️ Architecture ## 🏗️ Architecture & Lab Setup Lab Setup
+## 🏗️ Architecture & Lab Setup
 
 ![Network Topology](docs/images/topology.png)
 - **Workstation / Source Host (`SOC01`):** `192.168.56.10` (Kali Linux)

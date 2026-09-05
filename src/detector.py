@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Ransomware Lateral Movement Detector
-Analyzes network connection logs for SMB port 445 scanning/sweeping activity.
+Lateral Movement & Ransomware Vector Detection Engine
+Analyzes network connection logs for SMB port 445 abuse and rapid sweeps.
+Mapped to MITRE ATT&CK: T1021.002 (SMB Shares) & T1046 (Network Service Discovery)
 """
 
 from collections import defaultdict
@@ -9,17 +10,17 @@ import re
 
 LOG_FILE = "data/incident.log"
 SUSPICIOUS_PORT = "445"
-THRESHOLD_CONNECTIONS = 3
+VOLUME_THRESHOLD = 10
+CRITICAL_ASSETS = {
+    "192.168.56.20": "FILE01 (Primary Enterprise File Server)"
+}
 
-def analyze_log(file_path):
-    print("=" * 60)
-    print("🔍 INITIATING SOC LOG ANALYSIS: RANSOMWARE DETECTION")
-    print("=" * 60)
+def analyze_traffic(file_path):
+    print("=" * 65)
+    print("🛡️  APEX MANUFACTURING SOC: AUTOMATED DETECTION ENGINE")
+    print("=" * 65)
     
-    # Track connection counts: source_ip -> {destination_ip: count}
     activity = defaultdict(lambda: defaultdict(int))
-    
-    # Regular expression to extract: timestamp, source_ip, dest_ip, port
     log_pattern = re.compile(r'(\d{2}:\d{2}:\d{2})\s+(\d+\.\d+\.\d+\.\d+)\s+->\s+(\d+\.\d+\.\d+\.\d+):(\d+)')
     
     try:
@@ -27,37 +28,45 @@ def analyze_log(file_path):
             for line in f:
                 match = log_pattern.search(line.strip())
                 if match:
-                    timestamp, src_ip, dst_ip, port = match.groups()
+                    _, src_ip, dst_ip, port = match.groups()
                     if port == SUSPICIOUS_PORT:
                         activity[src_ip][dst_ip] += 1
-                        
     except FileNotFoundError:
-        print(f"[-] Error: Could not find log file at {file_path}")
+        print(f"[-] Error: Target log file not found at {file_path}")
         return
 
-    # Detection Evaluation
-    alerts_triggered = False
     for src, targets in activity.items():
-        total_smb_attempts = sum(targets.values())
+        total_attempts = sum(targets.values())
         unique_targets = len(targets)
+        hit_critical_asset = any(dst in CRITICAL_ASSETS for dst in targets)
         
-        print(f"\n[+] Source IP: {src}")
-        print(f"    Total Port {SUSPICIOUS_PORT} (SMB) Connections: {total_smb_attempts}")
+        print(f"\n[+] Monitored Source Host: {src} (SOC01 Workstation)")
+        print(f"    Total Port {SUSPICIOUS_PORT} (SMB) Requests : {total_attempts}")
         print(f"    Unique Internal Targets Probed: {unique_targets}")
         
         for dst, count in targets.items():
-            print(f"      -> Target {dst}: {count} connection requests")
+            asset_label = f" [{CRITICAL_ASSETS[dst]}]" if dst in CRITICAL_ASSETS else ""
+            print(f"      -> Target {dst}{asset_label}: {count} requests")
 
-        # Flag rule: Multiple attempts across multiple internal targets
-        if unique_targets > 1 or total_smb_attempts >= THRESHOLD_CONNECTIONS:
-            alerts_triggered = True
-            print("\n🚨 [ALERT: HIGH SEVERITY] Potential Ransomware Lateral Movement Detected!")
-            print(f"   Action: Isolate host {src} immediately to contain lateral spread.")
-            
-    if not alerts_triggered:
-        print("\n[✓] No anomalous SMB lateral movement detected.")
-        
-    print("=" * 60)
+        # Determine Alert Severity
+        if hit_critical_asset and total_attempts >= VOLUME_THRESHOLD:
+            severity = "CRITICAL"
+        elif unique_targets > 1 or total_attempts >= VOLUME_THRESHOLD:
+            severity = "HIGH"
+        else:
+            severity = "INFORMATIONAL"
+
+        if severity in ["CRITICAL", "HIGH"]:
+            print("\n" + "!" * 65)
+            print(f"🚨 [ALERT: {severity} SEVERITY] LATERAL MOVEMENT DETECTED")
+            print("!" * 65)
+            print("▶ MITRE ATT&CK Techniques:")
+            print("   • T1021.002 - Remote Services: SMB/Windows Admin Shares")
+            print("   • T1046     - Network Service Discovery (Port Scan / Sweep)")
+            print(f"▶ Recommended Action: Immediately quarantine {src} from subnet 192.168.56.0/24.")
+            print("!" * 65)
+
+    print("\n" + "=" * 65)
 
 if __name__ == "__main__":
-    analyze_log(LOG_FILE)
+    analyze_traffic(LOG_FILE)
